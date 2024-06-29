@@ -1,25 +1,12 @@
 function [text, message, response] = callOpenAIChatAPI(messages, functions, nvp)
+% This function is undocumented and will change in a future release
+
 %callOpenAIChatAPI Calls the openAI chat completions API.
 %
 %   MESSAGES and FUNCTIONS should be structs matching the json format
 %   required by the OpenAI Chat Completions API.
 %   Ref: https://platform.openai.com/docs/guides/gpt/chat-completions-api
 %
-%   Currently, the supported NVP are, including the equivalent name in the API:
-%    - ToolChoice (tool_choice)
-%    - ModelName (model)
-%    - Temperature (temperature)
-%    - TopProbabilityMass (top_p)
-%    - NumCompletions (n)
-%    - StopSequences (stop)
-%    - MaxNumTokens (max_tokens)
-%    - PresencePenalty (presence_penalty)
-%    - FrequencyPenalty (frequence_penalty)
-%    - ResponseFormat (response_format)
-%    - Seed (seed)
-%    - ApiKey
-%    - TimeOut
-%    - StreamFun
 %   More details on the parameters: https://platform.openai.com/docs/api-reference/chat/create
 %
 %   Example
@@ -48,34 +35,34 @@ function [text, message, response] = callOpenAIChatAPI(messages, functions, nvp)
 %   apiKey = "your-api-key-here"
 %
 %   % Send a request
-%   [text, message] = llms.internal.callOpenAIChatAPI(messages, functions, ApiKey=apiKey)
+%   [text, message] = llms.internal.callOpenAIChatAPI(messages, functions, APIKey=apiKey)
 
 %   Copyright 2023-2024 The MathWorks, Inc.
 
 arguments
     messages
     functions
-    nvp.ToolChoice = []
-    nvp.ModelName = "gpt-3.5-turbo"
-    nvp.Temperature = 1
-    nvp.TopProbabilityMass = 1
-    nvp.NumCompletions = 1
-    nvp.StopSequences = []
-    nvp.MaxNumTokens = inf
-    nvp.PresencePenalty = 0
-    nvp.FrequencyPenalty = 0
-    nvp.ResponseFormat = "text"
-    nvp.Seed = []
-    nvp.ApiKey = ""
-    nvp.TimeOut = 10
-    nvp.StreamFun = []
+    nvp.ToolChoice
+    nvp.ModelName
+    nvp.Temperature
+    nvp.TopP
+    nvp.NumCompletions
+    nvp.StopSequences
+    nvp.MaxNumTokens
+    nvp.PresencePenalty
+    nvp.FrequencyPenalty
+    nvp.ResponseFormat
+    nvp.Seed
+    nvp.APIKey
+    nvp.TimeOut
+    nvp.StreamFun
 end
 
 END_POINT = "https://api.openai.com/v1/chat/completions";
 
 parameters = buildParametersCall(messages, functions, nvp);
 
-[response, streamedText] = llms.internal.sendRequest(parameters,nvp.ApiKey, END_POINT, nvp.TimeOut, nvp.StreamFun);
+[response, streamedText] = llms.internal.sendRequest(parameters,nvp.APIKey, END_POINT, nvp.TimeOut, nvp.StreamFun);
 
 % If call errors, "choices" will not be part of response.Body.Data, instead
 % we get response.Body.Data.error
@@ -160,7 +147,7 @@ end
 function dict = mapNVPToParameters()
 dict = dictionary();
 dict("Temperature") = "temperature";
-dict("TopProbabilityMass") = "top_p";
+dict("TopP") = "top_p";
 dict("NumCompletions") = "n";
 dict("StopSequences") = "stop";
 dict("MaxNumTokens") = "max_tokens";

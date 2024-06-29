@@ -1,35 +1,48 @@
-classdef(Sealed) openAIChat
+classdef(Sealed) openAIChat < llms.internal.textGenerator & ...
+    llms.internal.gptPenalties & llms.internal.hasTools & llms.internal.needsAPIKey
 %openAIChat Chat completion API from OpenAI.
 %
 %   CHAT = openAIChat(systemPrompt) creates an openAIChat object with the
 %   specified system prompt.
 %
-%   CHAT = openAIChat(systemPrompt,ApiKey=key) uses the specified API key
+%   CHAT = openAIChat(systemPrompt,APIKey=key) uses the specified API key
 %
 %   CHAT = openAIChat(systemPrompt,Name=Value) specifies additional options
 %   using one or more name-value arguments:
-%
-%   Tools                   - Array of openAIFunction objects representing
-%                             custom functions to be used during chat completions.
 %
 %   ModelName               - Name of the model to use for chat completions.
 %                             The default value is "gpt-3.5-turbo".
 %
 %   Temperature             - Temperature value for controlling the randomness
-%                             of the output. Default value is 1.
+%                             of the output. Default value is 1; higher values
+%                             increase the randomness (in some sense,
+%                             the “creativity”) of outputs, lower values
+%                             reduce it. Setting Temperature=0 removes
+%                             randomness from the output altogether.
 %
-%   TopProbabilityMass      - Top probability mass value for controlling the
-%                             diversity of the output. Default value is 1.
+%   TopP                    - Top probability mass value for controlling the
+%                             diversity of the output. Default value is 1;
+%                             lower values imply that only the more likely
+%                             words can appear in any particular place.
+%                             This is also known as top-p sampling.
+%
+%   Tools                   - Array of openAIFunction objects representing
+%                             custom functions to be used during chat completions.
 %
 %   StopSequences           - Vector of strings that when encountered, will
 %                             stop the generation of tokens. Default
 %                             value is empty.
+%                             Example: ["The end.", "And that's all she wrote."]
 %
 %   PresencePenalty         - Penalty value for using a token in the response
 %                             that has already been used. Default value is 0.
+%                             Higher values reduce repetition of words in the output.
 %
 %   FrequencyPenalty        - Penalty value for using a token that is frequent
-%                             in the training data. Default value is 0.
+%                             in the output. Default value is 0.
+%                             Higher values reduce repetition of words in the output.
+%
+%   TimeOut                 - Connection Timeout in seconds. Default value is 10.
 %
 %   StreamFun               - Function to callback when streaming the
 %                             result
@@ -46,7 +59,7 @@ classdef(Sealed) openAIChat
 %
 %       Temperature          - Temperature of generation.
 %
-%       TopProbabilityMass   - Top probability mass to consider for generation.
+%       TopP                 - Top probability mass to consider for generation.
 %
 %       StopSequences        - Sequences to stop the generation of tokens.
 %
@@ -61,70 +74,32 @@ classdef(Sealed) openAIChat
 %       FunctionNames        - Names of the functions that the model can
 %                              request calls.
 %
-%       ResponseFormat       - Specifies the response format, text or json
+%       ResponseFormat       - Specifies the response format, "text" or "json".
 %
-%       TimeOut              - Connection Timeout in seconds (default: 10 secs)
+%       TimeOut              - Connection Timeout in seconds.
 %
 
 % Copyright 2023-2024 The MathWorks, Inc.
 
-    properties        
-        %TEMPERATURE   Temperature of generation.
-        Temperature
-
-        %TOPPROBABILITYMASS   Top probability mass to consider for generation.
-        TopProbabilityMass
-
-        %STOPSEQUENCES   Sequences to stop the generation of tokens.
-        StopSequences
-
-        %PRESENCEPENALTY   Penalty for using a token in the response that has already been used.
-        PresencePenalty
-
-        %FREQUENCYPENALTY   Penalty for using a token that is frequent in the training data.
-        FrequencyPenalty
-    end
-
-    properties(SetAccess=private) 
-        %TIMEOUT    Connection timeout in seconds (default 10 secs)
-        TimeOut
-
-        %FUNCTIONNAMES   Names of the functions that the model can request calls
-        FunctionNames
-
+    properties(SetAccess=private)
         %MODELNAME   Model name.
         ModelName
-
-        %SYSTEMPROMPT   System prompt.
-        SystemPrompt = []
-
-        %RESPONSEFORMAT     Response format, "text" or "json"       
-        ResponseFormat 
     end
 
-    properties(Access=private)
-        Tools
-        FunctionsStruct
-        ApiKey
-        StreamFun
-    end
 
     methods
-        function this = openAIChat(systemPrompt, nvp)           
+        function this = openAIChat(systemPrompt, nvp)
             arguments
                 systemPrompt                       {llms.utils.mustBeTextOrEmpty} = []
                 nvp.Tools                    (1,:) {mustBeA(nvp.Tools, "openAIFunction")} = openAIFunction.empty
-                nvp.ModelName                (1,1) {mustBeMember(nvp.ModelName,["gpt-4-turbo", ...
-                                                        "gpt-4-turbo-2024-04-09","gpt-4","gpt-4-0613", ...
-                                                        "gpt-3.5-turbo","gpt-3.5-turbo-0125", ...
-                                                        "gpt-3.5-turbo-1106"])} = "gpt-3.5-turbo"
-                nvp.Temperature                    {mustBeValidTemperature} = 1
-                nvp.TopProbabilityMass             {mustBeValidTopP} = 1
-                nvp.StopSequences                  {mustBeValidStop} = {}
+                nvp.ModelName                (1,1) string {mustBeModel} = "gpt-3.5-turbo"
+                nvp.Temperature                    {llms.utils.mustBeValidTemperature} = 1
+                nvp.TopP                           {llms.utils.mustBeValidTopP} = 1
+                nvp.StopSequences                  {llms.utils.mustBeValidStop} = {}
                 nvp.ResponseFormat           (1,1) string {mustBeMember(nvp.ResponseFormat,["text","json"])} = "text"
-                nvp.ApiKey                         {mustBeNonzeroLengthTextScalar} 
-                nvp.PresencePenalty                {mustBeValidPenalty} = 0
-                nvp.FrequencyPenalty               {mustBeValidPenalty} = 0
+                nvp.APIKey                         {mustBeNonzeroLengthTextScalar}
+                nvp.PresencePenalty                {llms.utils.mustBeValidPenalty} = 0
+                nvp.FrequencyPenalty               {llms.utils.mustBeValidPenalty} = 0
                 nvp.TimeOut                  (1,1) {mustBeReal,mustBePositive} = 10
                 nvp.StreamFun                (1,1) {mustBeA(nvp.StreamFun,'function_handle')}
             end
@@ -143,34 +118,26 @@ classdef(Sealed) openAIChat
                 this.Tools = nvp.Tools;
                 [this.FunctionsStruct, this.FunctionNames] = functionAsStruct(nvp.Tools);
             end
-            
+
             if ~isempty(systemPrompt)
                 systemPrompt = string(systemPrompt);
-                if ~(strlength(systemPrompt)==0)
+                if systemPrompt ~= ""
                    this.SystemPrompt = {struct("role", "system", "content", systemPrompt)};
                 end
             end
 
             this.ModelName = nvp.ModelName;
             this.Temperature = nvp.Temperature;
-            this.TopProbabilityMass = nvp.TopProbabilityMass;
+            this.TopP = nvp.TopP;
             this.StopSequences = nvp.StopSequences;
 
             % ResponseFormat is only supported in the latest models only
-            if (nvp.ResponseFormat == "json")
-                if ismember(this.ModelName,["gpt-4","gpt-4-0613"])
-                    error("llms:invalidOptionAndValueForModel", ...
-                        llms.utils.errorMessageCatalog.getMessage("llms:invalidOptionAndValueForModel", "ResponseFormat", "json", this.ModelName));
-                else
-                    warning("llms:warningJsonInstruction", ...
-                        llms.utils.errorMessageCatalog.getMessage("llms:warningJsonInstruction"))
-                end
-
-            end
+            llms.openai.validateResponseFormat(nvp.ResponseFormat, this.ModelName);
+            this.ResponseFormat = nvp.ResponseFormat;
 
             this.PresencePenalty = nvp.PresencePenalty;
             this.FrequencyPenalty = nvp.FrequencyPenalty;
-            this.ApiKey = llms.internal.getApiKeyFromNvpOrEnv(nvp);
+            this.APIKey = llms.internal.getApiKeyFromNvpOrEnv(nvp,"OPENAI_API_KEY");
             this.TimeOut = nvp.TimeOut;
         end
 
@@ -189,19 +156,19 @@ classdef(Sealed) openAIChat
             %       MaxNumTokens     - Maximum number of tokens in the generated response.
             %                          Default value is inf.
             %
-            %       ToolChoice       - Function to execute. 'none', 'auto', 
+            %       ToolChoice       - Function to execute. 'none', 'auto',
             %                          or specify the function to call.
             %
             %       Seed             - An integer value to use to obtain
             %                          reproducible responses
-            %                           
-            % Currently, GPT-4 Turbo with vision does not support the message.name 
+            %
+            % Currently, GPT-4 Turbo with vision does not support the message.name
             % parameter, functions/tools, response_format parameter, and stop
             % sequences. It also has a low MaxNumTokens default, which can be overridden.
 
             arguments
                 this                    (1,1) openAIChat
-                messages                (1,1) {mustBeValidMsgs}
+                messages                {mustBeValidMsgs}
                 nvp.NumCompletions      (1,1) {mustBePositive, mustBeInteger} = 1
                 nvp.MaxNumTokens        (1,1) {mustBePositive} = inf
                 nvp.ToolChoice          {mustBeValidFunctionCall(this, nvp.ToolChoice)} = []
@@ -210,83 +177,31 @@ classdef(Sealed) openAIChat
 
             toolChoice = convertToolChoice(this, nvp.ToolChoice);
 
+            messages = convertCharsToStrings(messages);
             if isstring(messages) && isscalar(messages)
-                messagesStruct = {struct("role", "user", "content", messages)};               
+                messagesStruct = {struct("role", "user", "content", messages)};
             else
                 messagesStruct = messages.Messages;
             end
 
-            if iscell(messagesStruct{end}.content) && any(cellfun(@(x) isfield(x,"image_url"), messagesStruct{end}.content))
-                if ~ismember(this.ModelName,["gpt-4-turbo","gpt-4-turbo-2024-04-09"]) 
-                 error("llms:invalidContentTypeForModel", ...
-                       llms.utils.errorMessageCatalog.getMessage("llms:invalidContentTypeForModel", "Image content", this.ModelName));
-                end
-            end
+            llms.openai.validateMessageSupported(messagesStruct{end}, this.ModelName);
 
             if ~isempty(this.SystemPrompt)
                 messagesStruct = horzcat(this.SystemPrompt, messagesStruct);
             end
-            
+
             [text, message, response] = llms.internal.callOpenAIChatAPI(messagesStruct, this.FunctionsStruct,...
                 ModelName=this.ModelName, ToolChoice=toolChoice, Temperature=this.Temperature, ...
-                TopProbabilityMass=this.TopProbabilityMass, NumCompletions=nvp.NumCompletions,...
+                TopP=this.TopP, NumCompletions=nvp.NumCompletions,...
                 StopSequences=this.StopSequences, MaxNumTokens=nvp.MaxNumTokens, ...
                 PresencePenalty=this.PresencePenalty, FrequencyPenalty=this.FrequencyPenalty, ...
                 ResponseFormat=this.ResponseFormat,Seed=nvp.Seed, ...
-                ApiKey=this.ApiKey,TimeOut=this.TimeOut, StreamFun=this.StreamFun);
+                APIKey=this.APIKey,TimeOut=this.TimeOut, StreamFun=this.StreamFun);
 
             if isfield(response.Body.Data,"error")
                 err = response.Body.Data.error.message;
-                text = llms.utils.errorMessageCatalog.getMessage("llms:apiReturnedError",err);
-                message = struct("role","assistant","content",text);
+                error("llms:apiReturnedError",llms.utils.errorMessageCatalog.getMessage("llms:apiReturnedError",err));
             end
-
-        end
-
-        function this = set.Temperature(this, temperature)
-            arguments
-                this openAIChat
-                temperature 
-            end
-            mustBeValidTemperature(temperature);
-            
-            this.Temperature = temperature;
-        end
-
-        function this = set.TopProbabilityMass(this,topP)
-            arguments
-                this openAIChat
-                topP
-            end
-            mustBeValidTopP(topP);
-            this.TopProbabilityMass = topP;
-        end
-
-        function this = set.StopSequences(this,stop)
-            arguments
-                this openAIChat
-                stop 
-            end
-            mustBeValidStop(stop);
-            this.StopSequences = stop;
-        end
-
-        function this = set.PresencePenalty(this,penalty)
-            arguments
-                this openAIChat
-                penalty 
-            end
-            mustBeValidPenalty(penalty)
-            this.PresencePenalty = penalty;
-        end
-
-        function this = set.FrequencyPenalty(this,penalty)
-            arguments
-                this openAIChat
-                penalty
-            end
-            mustBeValidPenalty(penalty)
-            this.FrequencyPenalty = penalty;
         end
     end
 
@@ -305,7 +220,7 @@ classdef(Sealed) openAIChat
             % if toolChoice is empty
             if isempty(toolChoice)
                 % if Tools is not empty, the default is 'auto'.
-                if ~isempty(this.Tools) 
+                if ~isempty(this.Tools)
                     toolChoice = "auto";
                 end
             elseif ~ismember(toolChoice,["auto","none"])
@@ -330,44 +245,21 @@ functionNames = strings(1, numFunctions);
 
 for i = 1:numFunctions
     functionsStruct{i} = struct('type','function', ...
-        'function',encodeStruct(functions(i))) ;
+        'function',encodeStruct(functions(i)));
     functionNames(i) = functions(i).FunctionName;
 end
 end
 
 function mustBeValidMsgs(value)
-if isa(value, "openAIMessages")
-    if numel(value.Messages) == 0 
+if isa(value, "messageHistory")
+    if numel(value.Messages) == 0
         error("llms:mustHaveMessages", llms.utils.errorMessageCatalog.getMessage("llms:mustHaveMessages"));
     end
 else
-    try 
+    try
         llms.utils.mustBeNonzeroLengthTextScalar(value);
     catch ME
         error("llms:mustBeMessagesOrTxt", llms.utils.errorMessageCatalog.getMessage("llms:mustBeMessagesOrTxt"));
-    end
-end
-end
-
-function mustBeValidPenalty(value)
-validateattributes(value, {'numeric'}, {'real', 'scalar', 'nonsparse', '<=', 2, '>=', -2})
-end
-
-function mustBeValidTopP(value)
-validateattributes(value, {'numeric'}, {'real', 'scalar', 'nonnegative', 'nonsparse', '<=', 1})
-end
-
-function mustBeValidTemperature(value)
-validateattributes(value, {'numeric'}, {'real', 'scalar', 'nonnegative', 'nonsparse', '<=', 2})
-end
-
-function mustBeValidStop(value)
-if ~isempty(value)
-    mustBeVector(value);
-    mustBeNonzeroLengthText(value);
-    % This restriction is set by the OpenAI API
-    if numel(value)>4
-        error("llms:stopSequencesMustHaveMax4Elements", llms.utils.errorMessageCatalog.getMessage("llms:stopSequencesMustHaveMax4Elements"));
     end
 end
 end
@@ -376,4 +268,8 @@ function mustBeIntegerOrEmpty(value)
     if ~isempty(value)
         mustBeInteger(value)
     end
+end
+
+function mustBeModel(model)
+    mustBeMember(model,llms.openai.models);
 end
