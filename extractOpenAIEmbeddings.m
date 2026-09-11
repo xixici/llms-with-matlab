@@ -9,7 +9,7 @@ function [emb, response] = extractOpenAIEmbeddings(text, nvp)
 %
 %   'ModelName'                 - The ID of the model to use.
 %
-%   'ApiKey'                    - OpenAI API token. It can also be specified by
+%   'APIKey'                    - OpenAI API token. It can also be specified by
 %                                setting the environment variable OPENAI_API_KEY
 %
 %   'TimeOut'                   - Connection Timeout in seconds (default: 10 secs)
@@ -23,17 +23,18 @@ function [emb, response] = extractOpenAIEmbeddings(text, nvp)
 %   Copyright 2023-2024 The MathWorks, Inc.
 
 arguments
-    text           (1,:) {mustBeNonzeroLengthText}
-    nvp.ModelName  (1,1) {mustBeMember(nvp.ModelName,["text-embedding-ada-002", ...
-                        "text-embedding-3-large", "text-embedding-3-small"])} = "text-embedding-ada-002"
-    nvp.TimeOut    (1,1) {mustBeReal,mustBePositive} = 10
-    nvp.Dimensions (1,1) {mustBeInteger,mustBePositive}
-    nvp.ApiKey           {llms.utils.mustBeNonzeroLengthTextScalar}
+    text           (1,:)        {mustBeNonzeroLengthText}
+    nvp.ModelName  (1,1) string {mustBeMember(nvp.ModelName,["text-embedding-ada-002", ...
+                                        "text-embedding-3-large", "text-embedding-3-small"])} = "text-embedding-ada-002"
+    nvp.TimeOut    (1,1)        {mustBeNumeric,mustBeReal,mustBePositive} = 10
+    nvp.Dimensions (1,1)        {mustBeNumeric,mustBeInteger,mustBePositive}
+    nvp.APIKey                  {llms.utils.mustBeNonzeroLengthTextScalar}
 end
 
 END_POINT = "https://api.openai.com/v1/embeddings";
 
-key = llms.internal.getApiKeyFromNvpOrEnv(nvp);
+key = llms.internal.getApiKeyFromNvpOrEnv(nvp,"OPENAI_API_KEY");
+text = convertCharsToStrings(text);
 
 parameters = struct("input",text,"model",nvp.ModelName);
 
@@ -47,7 +48,7 @@ if isfield(nvp, "Dimensions")
 end
 
 
-response = llms.internal.sendRequest(parameters,key, END_POINT, nvp.TimeOut);
+response = llms.internal.sendRequestWrapper(parameters,key, END_POINT, nvp.TimeOut);
 
 if isfield(response.Body.Data, "data")
     emb = [response.Body.Data.data.embedding];
@@ -62,6 +63,7 @@ function mustBeCorrectDimensions(dimensions,modelName)
     dictionary(["text-embedding-3-large", "text-embedding-3-small"], ...
     [3072,1536]);
 
+    mustBeNumeric(dimensions);
     if dimensions>model2dim(modelName)
         error("llms:dimensionsMustBeSmallerThan", ...
             llms.utils.errorMessageCatalog.getMessage("llms:dimensionsMustBeSmallerThan", ...

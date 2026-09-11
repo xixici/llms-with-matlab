@@ -1,7 +1,7 @@
 classdef errorMessageCatalog
 %errorMessageCatalog Stores the error messages from this repository
 
-%   Copyright 2023-2024 The MathWorks, Inc.
+%   Copyright 2023-2025 The MathWorks, Inc.
 
     properties(Constant)
         %CATALOG dictionary mapping error ids to error msgs
@@ -28,6 +28,15 @@ classdef errorMessageCatalog
                 end
             end
         end
+
+        function s = createCatalog()
+            %createCatalog will run the initialization code and return the catalog
+            %   This is only meant to get more correct test coverage reports:
+            %   The test coverage reports do not include the properties initialization
+            %   for Catalog from above, so we have a test seam here to re-run it
+            %   within the framework, where it is reported.
+            s = buildErrorMessageCatalog;
+        end
     end
 end
 
@@ -35,25 +44,35 @@ function catalog = buildErrorMessageCatalog
 catalog = dictionary("string", "string");
 catalog("llms:mustBeUnique") = "Values must be unique.";
 catalog("llms:mustBeVarName") = "Parameter name must begin with a letter and contain not more than 'namelengthmax' characters.";
+catalog("llms:mustBeNonzeroLengthTextOrStruct") = "Value must be a character vector, string scalar, scalar cell array of character vectors, struct, or cell array of structs.";
+catalog("llms:mustOnlyBeStruct") = "When creating an openAIFunction object from tools provided by MCP servers, additional parameters are not supported.";
 catalog("llms:parameterMustBeUnique") = "A parameter name equivalent to '{1}' already exists in Parameters. Redefining a parameter is not allowed.";
 catalog("llms:mustBeAssistantCall") = "Input struct must contain field 'role' with value 'assistant', and field 'content'.";
 catalog("llms:mustBeAssistantWithContent") = "Input struct must contain field 'content' containing text with one or more characters.";
 catalog("llms:mustBeAssistantWithIdAndFunction") = "Field 'tool_call' must be a struct with fields 'id' and 'function'.";
 catalog("llms:mustBeAssistantWithNameAndArguments") = "Field 'function' must be a struct with fields 'name' and 'arguments'.";
-catalog("llms:assistantMustHaveTextNameAndArguments") = "Fields 'name' and 'arguments' must be text with one or more characters.";
-catalog("llms:mustBeValidIndex") = "Value is larger than the number of elements in Messages ({1}).";
-catalog("llms:stopSequencesMustHaveMax4Elements") = "Number of elements must not be larger than 4.";
-catalog("llms:keyMustBeSpecified") = "API key not found as environment variable OPENAI_API_KEY and not specified via ApiKey parameter.";
-catalog("llms:mustHaveMessages") = "Value must contain at least one message in Messages.";
-catalog("llms:mustSetFunctionsForCall") = "When no functions are defined, ToolChoice must not be specified.";
-catalog("llms:mustBeMessagesOrTxt") = "Messages must be text with one or more characters or an openAIMessages objects.";
-catalog("llms:invalidOptionAndValueForModel") = "'{1}' with value '{2}' is not supported for ModelName '{3}'";
-catalog("llms:invalidOptionForModel") = "{1} is not supported for ModelName '{2}'";
-catalog("llms:invalidContentTypeForModel") = "{1} is not supported for ModelName '{2}'";
-catalog("llms:functionNotAvailableForModel") = "This function is not supported for ModelName '{1}'";
-catalog("llms:promptLimitCharacter") = "Prompt must have a maximum length of {1} characters for ModelName '{2}'";
-catalog("llms:pngExpected") = "Argument must be a PNG image.";
-catalog("llms:warningJsonInstruction") = "When using JSON mode, you must also prompt the model to produce JSON yourself via a system or user message.";
-catalog("llms:apiReturnedError") = "OpenAI API Error: {1}";
+catalog("llms:assistantMustHaveTextName") = "Field 'name' must be text with one or more characters.";
+catalog("llms:assistantMustHaveTextOrStructArguments") = "Field 'arguments' must be text with one or more characters, or a scalar struct.";
+catalog("llms:mustBeValidIndex") = "Index exceeds the number of array elements. Index must be less than or equal to {1}.";
+catalog("llms:removeFromEmptyHistory") = "Unable to remove message from empty message history.";
+catalog("llms:stopSequencesMustHaveMax4Elements") = "Number of stop sequences must be less than or equal to 4.";
+catalog("llms:endpointMustBeSpecified") = "Unable to find endpoint. Either set environment variable AZURE_OPENAI_ENDPOINT or specify name-value argument ""Endpoint"".";
+catalog("llms:deploymentMustBeSpecified") = "Unable to find deployment name. Either set environment variable AZURE_OPENAI_DEPLOYMENT or specify name-value argument ""DeploymentID"".";
+catalog("llms:keyMustBeSpecified") = "Unable to find API key. Either set environment variable {1} or specify name-value argument ""APIKey"".";
+catalog("llms:mustHaveMessages") = "Message history must not be empty.";
+catalog("llms:mustSetFunctionsForCall") = "When Tools is empty, ToolChoice must be ""none"" or ""auto"".";
+catalog("llms:mustBeMessagesOrTxt") = "Message must be nonempty string, character array, cell array of character vectors, or messageHistory object.";
+catalog("llms:invalidOptionForModel") = "Invalid argument name {1} for model ""{2}"".";
+catalog("llms:promptLimitCharacter") = "Prompt must contain at most {1} characters for model ""{2}"".";
+catalog("llms:pngExpected") = "Image must be a PNG file (*.png).";
+catalog("llms:apiReturnedError") = "Server returned error indicating: ""{1}""";
+catalog("llms:apiReturnedIncompleteJSON") = "Generated output is not valid JSON: ""{1}""";
 catalog("llms:dimensionsMustBeSmallerThan") = "Dimensions must be less than or equal to {1}.";
+catalog("llms:stream:responseStreamer:InvalidInput") = "Input does not have the expected json format, got ""{1}"".";
+catalog("llms:unsupportedDatatypeInPrototype") = "Invalid data type ''{1}'' in prototype. Prototype must be a struct, composed of numerical, string, logical, categorical, or struct.";
+catalog("llms:incorrectResponseFormat") = "Invalid response format. Response format must be ""text"", ""json"", a struct, or a string with a JSON Schema definition.";
+catalog("llms:OllamaStructuredOutputNeeds05") = "Structured output is not supported for Ollama version {1}. Use version 0.5.0 or newer.";
+catalog("llms:noOllamaFound") = "Unable to connect to Ollama. Check that {1} is a valid endpoint and ensure that Ollama is installed and running.";
+catalog("llms:deprecatedMethod") = "Models supporting {1} method have been deprecated.";
+catalog("llms:deprecatedOption") = "Models supporting the {1} have been deprecated.";
 end

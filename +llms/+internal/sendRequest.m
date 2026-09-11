@@ -1,9 +1,11 @@
 function [response, streamedText] = sendRequest(parameters, token, endpoint, timeout, streamFun)
+% This function is undocumented and will change in a future release
+
 %sendRequest Sends a request to an ENDPOINT using PARAMETERS and
-%   api key TOKEN. TIMEOUT is the nubmer of seconds to wait for initial
+%   api key TOKEN. TIMEOUT is the number of seconds to wait for initial
 %   server connection. STREAMFUN is an optional callback function.
 
-%   Copyright 2023 The MathWorks, Inc.
+%   Copyright 2023-2025 The MathWorks, Inc.
 
 arguments
     parameters
@@ -15,17 +17,23 @@ end
 
 % Define the headers for the API request
 
-headers = [matlab.net.http.HeaderField('Content-Type', 'application/json')...
-    matlab.net.http.HeaderField('Authorization', "Bearer " + token)];
+headers = matlab.net.http.HeaderField('Content-Type', 'application/json');
+if ~isempty(token)
+    headers = [headers ...
+        matlab.net.http.HeaderField('Authorization', "Bearer " + token)...
+        matlab.net.http.HeaderField('api-key',token)];
+end
 
 % Define the request message
 request = matlab.net.http.RequestMessage('post',headers,parameters);
 
-% Create a HTTPOptions object;
+% set the timeout
 httpOpts = matlab.net.http.HTTPOptions;
-
-% Set the ConnectTimeout option
 httpOpts.ConnectTimeout = timeout;
+httpOpts.ResponseTimeout = timeout;
+
+% honor proxy, if requested
+httpOpts.ProxyURI = getenv("HTTPS_PROXY");
 
 % Send the request and store the response
 if isempty(streamFun)
@@ -36,5 +44,20 @@ else
     consumer = llms.stream.responseStreamer(streamFun);
     response = send(request, matlab.net.URI(endpoint),httpOpts,consumer);
     streamedText = consumer.ResponseText;
+end
+
+% There are situations where server returns raw bytes.
+if isnumeric(response.Body.Data)
+    txt = native2unicode(response.Body.Data.',"UTF-8");
+    % The message may be valid JSON, most likely a struct with an error
+    try
+        response.Body.Data = jsondecode(txt);
+        return
+    end
+    % The server may send jsonl/ndjson; convert to a JSON array.
+    json = "[" + replace(strtrim(txt),newline,',') + "]";
+    try
+        response.Body.Data = jsondecode(json);
+    end
 end
 end
